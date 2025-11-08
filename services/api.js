@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { storage } from './storage';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8080';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -44,8 +44,53 @@ export const reportAPI = {
   },
 
   create: async (data) => {
-    const response = await api.post('/reports/', data);
-    return response.data;
+    // Check if there's a photo to upload
+    if (data.photo && data.photo.startsWith('file://')) {
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      
+      // Append all fields
+      formData.append('latitude', data.latitude.toString());
+      formData.append('longitude', data.longitude.toString());
+      formData.append('problem_type', data.problem_type);
+      
+      // Handle disability_types array - for React Native, send as comma-separated string
+      if (Array.isArray(data.disability_types)) {
+        formData.append('disability_types', data.disability_types.join(','));
+      } else {
+        formData.append('disability_types', data.disability_types);
+      }
+      
+      formData.append('severity', data.severity);
+      formData.append('description', data.description);
+      
+      // Append photo file if exists - React Native specific handling
+      if (data.photo) {
+        const photoUri = data.photo;
+        const photoName = photoUri.split('/').pop() || 'photo.jpg';
+        const photoType = 'image/jpeg';
+        
+        // React Native FormData requires the file object differently
+        formData.append('photo', {
+          uri: photoUri,
+          type: photoType,
+          name: photoName,
+        });
+      }
+      
+      // Make request with FormData - remove default Content-Type to let axios set it with boundary
+      const response = await api.post('/reports/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        transformRequest: (data) => data, // Prevent axios from trying to stringify FormData
+      });
+      return response.data;
+    } else {
+      // Regular JSON request without photo
+      const response = await api.post('/reports/', data);
+      return response.data;
+    }
   },
 
   update: async (id, data) => {

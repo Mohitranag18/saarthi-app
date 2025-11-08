@@ -51,13 +51,22 @@ export default function ReportScreen() {
     setLoading(true);
     try {
       const data = await reportAPI.getAll();
-      setReports(data);
+
+      // 🔧 Convert string lat/lng to numbers safely
+      const parsedData = data.map((item) => ({
+        ...item,
+        latitude: item.latitude ? parseFloat(item.latitude) : null,
+        longitude: item.longitude ? parseFloat(item.longitude) : null,
+      }));
+
+      setReports(parsedData);
     } catch (error) {
       console.error('Load reports error:', error);
     } finally {
       setLoading(false);
     }
   };
+
 
   const loadPendingReports = async () => {
     const pending = await getPendingReports();
@@ -78,7 +87,7 @@ export default function ReportScreen() {
           disability_types: report.disabilityTypes,
           severity: report.severity,
           description: report.description,
-          photo_url: report.photo,
+          photo: report.photo, // Use photo instead of photo_url for API
         });
         
         await removePendingReport(report.timestamp);
@@ -116,13 +125,13 @@ export default function ReportScreen() {
 
     try {
       await reportAPI.create({
-        latitude: reportData.location.latitude,
-        longitude: reportData.location.longitude,
+        latitude: Number(reportData.location.latitude.toFixed(8)),  // Round to 6 decimals
+        longitude: Number(reportData.location.longitude.toFixed(8)),
         problem_type: reportData.problemType,
         disability_types: reportData.disabilityTypes,
         severity: reportData.severity,
         description: reportData.description,
-        photo_url: reportData.photo,
+        photo: reportData.photo || undefined, // Send undefined instead of null
       });
 
       Alert.alert('Success', 'Report submitted successfully');
