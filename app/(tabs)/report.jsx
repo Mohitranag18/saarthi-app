@@ -48,24 +48,24 @@ export default function ReportScreen() {
   };
 
   const loadReports = async () => {
-    setLoading(true);
-    try {
-      const data = await reportAPI.getAll();
+  setLoading(true);
+  try {
+    const data = await reportAPI.getAll();
 
-      // 🔧 Convert string lat/lng to numbers safely
-      const parsedData = data.map((item) => ({
-        ...item,
-        latitude: item.latitude ? parseFloat(item.latitude) : null,
-        longitude: item.longitude ? parseFloat(item.longitude) : null,
-      }));
+    // 🔧 Convert string lat/lng to numbers safely
+    const parsedData = data.map((item) => ({
+      ...item,
+      latitude: item.latitude ? parseFloat(item.latitude) : null,
+      longitude: item.longitude ? parseFloat(item.longitude) : null,
+    }));
 
-      setReports(parsedData);
-    } catch (error) {
-      console.error('Load reports error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setReports(parsedData);
+  } catch (error) {
+    console.error('Load reports error:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
 
   const loadPendingReports = async () => {
