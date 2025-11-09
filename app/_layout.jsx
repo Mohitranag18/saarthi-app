@@ -4,8 +4,7 @@ import { AuthProvider } from "../context/AuthContext";
 import { useAuth } from "../context/AuthContext";
 import { useEffect } from "react";
 import { useRouter } from "expo-router";
-import { deactivateKeepAwake } from 'expo-keep-awake';
-deactivateKeepAwake();
+
 
 function RootLayoutContent() {
   const { isAuthenticated, loading } = useAuth();

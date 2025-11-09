@@ -12,9 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LocationPicker from '../../components/LocationPicker';
 import CustomMapView from '../../components/MapView';
-import RouteCard from '../../components/RouteCard';
 import { theme } from '../../constants/theme';
-import { routeAPI } from '../../services/api';
+import { directionsAPI } from '../../services/mapbox';
 import { getCurrentLocation } from '../../services/location';
 import { getUserPreferences, saveUserPreferences } from '../../utils/storage';
 
@@ -32,8 +31,8 @@ export default function HomeScreen() {
   const [disabilityProfile, setDisabilityProfile] = useState('wheelchair');
   const [routes, setRoutes] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState(null);
+  const [routePreference, setRoutePreference] = useState('fastest'); // 'fastest' or 'safest'
   const [loading, setLoading] = useState(false);
-  const [weather, setWeather] = useState(null);
 
   useEffect(() => {
     initializeLocation();
@@ -56,7 +55,14 @@ export default function HomeScreen() {
     }
   };
 
-  const handleCalculateRoutes = async () => {
+  const handleDisabilityProfileChange = (profileId) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDisabilityProfile(profileId);
+    // Save preference for future use
+    saveUserPreferences({ disabilityProfile: profileId });
+  };
+
+  const handleCalculateRoute = async () => {
     if (!startLocation || !endLocation) {
       Alert.alert('Missing Information', 'Please select both start and end locations');
       return;
@@ -66,44 +72,61 @@ export default function HomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const response = await routeAPI.calculate({
-        start: { lat: startLocation.latitude, lon: startLocation.longitude },
-        end: { lat: endLocation.latitude, lon: endLocation.longitude },
-        user_disability: disabilityProfile,
-      });
+      // Fetch multiple routes from mapping service
+      console.log('Fetching routes from mapping service...');
+      const fetchedRoutes = await directionsAPI.fetchMultipleRoutes(
+        { lat: startLocation.latitude, lng: startLocation.longitude },
+        { lat: endLocation.latitude, lng: endLocation.longitude }
+      );
 
-      setRoutes(response.routes);
-      setWeather(response.weather);
-      setSelectedRoute(response.routes.find((r) => r.type === 'safest'));
+      console.log(`Fetched ${fetchedRoutes.length} routes from mapping service`);
+
+      // Format routes with proper types
+      const formattedRoutes = fetchedRoutes.map((route, index) => ({
+        ...route,
+        type: index === 0 ? 'fastest' : 'safest',
+        coordinates: route.coordinates,
+        distance: route.distance,
+        duration: route.duration,
+        summary: route.summary || `Route ${index + 1}`,
+      }));
+
+      setRoutes(formattedRoutes);
       
-      await saveUserPreferences({ disabilityProfile });
+      // Select fastest route by default
+      setSelectedRoute(formattedRoutes[0]);
+      setRoutePreference('fastest');
+      
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error('Route calculation error:', error);
-      Alert.alert('Error', 'Failed to calculate routes. Please try again.');
+      Alert.alert('Error', 'Failed to calculate route. Please try again.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRouteSelect = (route) => {
+  const handleRoutePreferenceChange = (preference) => {
+    if (routes.length === 0) return;
+    
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedRoute(route);
-  };
-
-  const handleDisabilityProfileChange = (profileId) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setDisabilityProfile(profileId);
-    setRoutes([]);
-    setSelectedRoute(null);
+    
+    if (preference === 'fastest') {
+      setSelectedRoute(routes[0]); // First route is fastest
+    } else {
+      // Select any other route for "safest" (second route if available, otherwise first)
+      setSelectedRoute(routes.length > 1 ? routes[1] : routes[0]);
+    }
+    
+    setRoutePreference(preference);
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Smart Route Planning</Text>
-        <Text style={styles.subtitle}>Find accessible paths tailored for you</Text>
+        <Text style={styles.title}>Route Planning</Text>
+        <Text style={styles.subtitle}>Find the best route for your journey</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -153,37 +176,51 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={[styles.calculateButton, loading && styles.calculateButtonDisabled]}
-          onPress={handleCalculateRoutes}
+          onPress={handleCalculateRoute}
           disabled={loading}
           accessibilityRole="button"
-          accessibilityLabel="Calculate routes"
+          accessibilityLabel="Get route"
         >
           {loading ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : (
-            <Text style={styles.calculateButtonText}>Calculate Routes</Text>
+            <Text style={styles.calculateButtonText}>Get Route</Text>
           )}
         </TouchableOpacity>
 
-        {weather && (
-          <View style={styles.weatherCard}>
-            <Text style={styles.weatherText}>
-              🌤️ {weather.condition} • {weather.temperature}°C
-            </Text>
-          </View>
-        )}
-
         {routes.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Available Routes</Text>
-            {routes.map((route) => (
-              <RouteCard
-                key={route.type}
-                route={route}
-                selected={selectedRoute?.type === route.type}
-                onSelect={() => handleRouteSelect(route)}
-              />
-            ))}
+            <Text style={styles.sectionTitle}>Route Preference</Text>
+            <View style={styles.preferenceToggle}>
+              <TouchableOpacity
+                style={[
+                  styles.preferenceButton,
+                  routePreference === 'fastest' && styles.preferenceButtonSelected,
+                ]}
+                onPress={() => handleRoutePreferenceChange('fastest')}
+              >
+                <Text style={[
+                  styles.preferenceButtonText,
+                  routePreference === 'fastest' && styles.preferenceButtonTextSelected,
+                ]}>
+                  🚀 Fastest
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.preferenceButton,
+                  routePreference === 'safest' && styles.preferenceButtonSelected,
+                ]}
+                onPress={() => handleRoutePreferenceChange('safest')}
+              >
+                <Text style={[
+                  styles.preferenceButtonText,
+                  routePreference === 'safest' && styles.preferenceButtonTextSelected,
+                ]}>
+                  🛡️ Safest
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -192,8 +229,9 @@ export default function HomeScreen() {
         <View style={styles.mapPreview}>
           <CustomMapView
             userLocation={userLocation}
-            routeCoordinates={selectedRoute.coordinates}
-            style={{ height: 200 }}
+            routes={[selectedRoute]}
+            selectedRouteType={selectedRoute.type}
+            style={{ height: 300 }}
           />
         </View>
       )}
@@ -281,19 +319,35 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   },
-  weatherCard: {
+  preferenceToggle: {
+    flexDirection: 'row',
     backgroundColor: theme.colors.surface,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 4,
   },
-  weatherText: {
+  preferenceButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  preferenceButtonSelected: {
+    backgroundColor: theme.colors.primary + '20',
+    borderColor: theme.colors.primary,
+  },
+  preferenceButtonText: {
     fontSize: 14,
-    color: theme.colors.text.primary,
-    textAlign: 'center',
+    fontWeight: '600',
+    color: theme.colors.text.secondary,
+  },
+  preferenceButtonTextSelected: {
+    color: theme.colors.primary,
   },
   mapPreview: {
-    height: 200,
+    height: 300,
     borderTopWidth: 1,
     borderTopColor: theme.colors.surface,
   },
