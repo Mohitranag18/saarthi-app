@@ -48,29 +48,44 @@ export default function ReportScreen() {
   };
 
   const loadReports = async () => {
-  setLoading(true);
-  try {
-    const data = await reportAPI.getAll();
+    setLoading(true);
+    try {
+      const data = await reportAPI.getAll();
 
-    // 🔧 Convert string lat/lng to numbers safely
-    const parsedData = data.map((item) => ({
-      ...item,
-      latitude: item.latitude ? parseFloat(item.latitude) : null,
-      longitude: item.longitude ? parseFloat(item.longitude) : null,
-    }));
+      // 🔧 Convert string lat/lng to numbers safely
+      const parsedData = data.map((item) => ({
+        ...item,
+        latitude: item.latitude ? parseFloat(item.latitude) : null,
+        longitude: item.longitude ? parseFloat(item.longitude) : null,
+      }));
 
-    setReports(parsedData);
-  } catch (error) {
-    console.error('Load reports error:', error);
-  } finally {
-    setLoading(false);
-  }
-};
-
+      setReports(parsedData);
+    } catch (error) {
+      console.error('Load reports error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadPendingReports = async () => {
     const pending = await getPendingReports();
     setPendingCount(pending.length);
+  };
+
+  // Helper function to parse disability types into an array
+  const parseDisabilityTypes = (disabilityTypes) => {
+    if (typeof disabilityTypes === 'string') {
+      // Split comma-separated string into array
+      return disabilityTypes
+        .split(',')
+        .map(type => type.trim())
+        .filter(type => type.length > 0);
+    } else if (Array.isArray(disabilityTypes)) {
+      // Already an array, return as is
+      return disabilityTypes;
+    }
+    // Fallback to empty array
+    return [];
   };
 
   const syncPendingReports = async () => {
@@ -80,14 +95,17 @@ export default function ReportScreen() {
     let synced = 0;
     for (const report of pending) {
       try {
+        // Parse disability types into array and stringify for multipart/form-data
+        const disabilityTypesArray = parseDisabilityTypes(report.disabilityTypes);
+        
         await reportAPI.create({
           latitude: report.location.latitude,
           longitude: report.location.longitude,
           problem_type: report.problemType,
-          disability_types: report.disabilityTypes,
+          disability_types: JSON.stringify(disabilityTypesArray), // Stringify the array
           severity: report.severity,
           description: report.description,
-          photo: report.photo, // Use photo instead of photo_url for API
+          photo: report.photo,
         });
         
         await removePendingReport(report.timestamp);
@@ -124,14 +142,17 @@ export default function ReportScreen() {
     }
 
     try {
+      // Parse disability types into array and stringify for multipart/form-data
+      const disabilityTypesArray = parseDisabilityTypes(reportData.disabilityTypes);
+      
       await reportAPI.create({
-        latitude: Number(reportData.location.latitude.toFixed(8)),  // Round to 6 decimals
+        latitude: Number(reportData.location.latitude.toFixed(8)),
         longitude: Number(reportData.location.longitude.toFixed(8)),
         problem_type: reportData.problemType,
-        disability_types: reportData.disabilityTypes,
+        disability_types: JSON.stringify(disabilityTypesArray), // Stringify the array
         severity: reportData.severity,
         description: reportData.description,
-        photo: reportData.photo || undefined, // Send undefined instead of null
+        photo: reportData.photo || undefined,
       });
 
       Alert.alert('Success', 'Report submitted successfully');
@@ -346,7 +367,7 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     marginRight: 6,
-    },
+  },
   legendText: {
     fontSize: 12,
     color: theme.colors.text.secondary,

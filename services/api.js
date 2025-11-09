@@ -45,7 +45,7 @@ export const reportAPI = {
 
   create: async (data) => {
     // Check if there's a photo to upload
-    if (data.photo && data.photo.startsWith('file://')) {
+    if (data.photo && (data.photo.startsWith('file://') || data.photo.startsWith('content://'))) {
       // Create FormData for multipart upload
       const formData = new FormData();
       
@@ -67,8 +67,33 @@ export const reportAPI = {
       // Append photo file if exists - React Native specific handling
       if (data.photo) {
         const photoUri = data.photo;
-        const photoName = photoUri.split('/').pop() || 'photo.jpg';
-        const photoType = 'image/jpeg';
+        let photoName = photoUri.split('/').pop() || 'photo.jpg';
+        let photoType = 'image/jpeg';
+        
+        // Extract file extension to determine proper MIME type
+        const fileExtension = photoName.split('.').pop()?.toLowerCase();
+        switch (fileExtension) {
+          case 'png':
+            photoType = 'image/png';
+            break;
+          case 'jpg':
+          case 'jpeg':
+            photoType = 'image/jpeg';
+            break;
+          case 'gif':
+            photoType = 'image/gif';
+            break;
+          case 'webp':
+            photoType = 'image/webp';
+            break;
+          default:
+            photoType = 'image/jpeg';
+        }
+        
+        // Ensure we have a valid filename
+        if (!photoName.includes('.')) {
+          photoName = `photo.${fileExtension || 'jpg'}`;
+        }
         
         // React Native FormData requires the file object differently
         formData.append('photo', {

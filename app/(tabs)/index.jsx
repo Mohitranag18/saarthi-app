@@ -125,8 +125,8 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Route Planning</Text>
-        <Text style={styles.subtitle}>Find the best route for your journey</Text>
+        <Text style={styles.title}>Welcome to Saarthi</Text>
+        <Text style={styles.subtitle}>Your accessible navigation companion</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -223,18 +223,23 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
-      </ScrollView>
 
-      {selectedRoute && startLocation && endLocation && (
-        <View style={styles.mapPreview}>
-          <CustomMapView
-            userLocation={userLocation}
-            routes={[selectedRoute]}
-            selectedRouteType={selectedRoute.type}
-            style={{ height: 300 }}
-          />
-        </View>
-      )}
+        {selectedRoute && startLocation && endLocation && (
+          <View style={[styles.section, styles.mapSection]}>
+            <Text style={styles.sectionTitle}>Route Map</Text>
+            <View style={styles.mapContainer}>
+              <CustomMapView
+                userLocation={userLocation}
+                routes={[selectedRoute]}
+                selectedRouteType={selectedRoute.type}
+                startLocation={startLocation}
+                endLocation={endLocation}
+                style={{ height: 250 }}
+              />
+            </View>
+          </View>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -346,9 +351,14 @@ const styles = StyleSheet.create({
   preferenceButtonTextSelected: {
     color: theme.colors.primary,
   },
-  mapPreview: {
-    height: 300,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.surface,
+  mapSection: {
+    marginBottom: 32,
+  },
+  mapContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border || '#e5e7eb',
   },
 });
